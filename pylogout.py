@@ -35,6 +35,24 @@ class ShutdownApp(Gtk.Window):
     def __init__(self, config_data, config_dir):
         Gtk.Window.__init__(self)
         self.config_data = config_data
+        self.config_dir = config_dir
+
+        # --- Implementación de Atajos de Teclado ---
+        # 1. Mapear nombres de acción a funciones
+        self.action_map = {
+            'shutdown': self.on_shutdown_clicked,
+            'restart': self.on_reboot_clicked,
+            'logout': self.on_logout_clicked,
+            'hibernate': self.on_hibernate_clicked,
+            'cancel': self.on_cancel_clicked,
+            'lock': self.on_lock_clicked,
+            'suspend': self.on_suspend_clicked,
+            'switch': self.on_switch_clicked,
+        }
+
+        # 2. Crear el diccionario invertido de Tecla -> Acción
+        self.key_map = {v: k for k, v in self.config_data['shortcuts'].items()}
+        # -----------------------------------------
 
         self.set_decorated(False)
         self.fullscreen()
@@ -52,8 +70,7 @@ class ShutdownApp(Gtk.Window):
         except Exception as e:
             print(f"No se pudo cargar la imagen: {e}")
             # Si no se carga la imagen, poner un color de fondo
-            fallback_box = Gtk.Box()
-            overlay.add(fallback_box)
+            overlay.add(Gtk.Box())
 
         # Contenedor para los botones
         main_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=40)
@@ -63,83 +80,76 @@ class ShutdownApp(Gtk.Window):
         # Agregar el contenedor de botones como un overlay
         overlay.add_overlay(main_box) # Usar .add_overlay() para los widgets superpuestos
 
-        # Crear los botones como imágenes
-
-        # Botón para apagar
-        shutdown_icon_path = config_dir / config_data['theme']['shutdown_icon']
-        image_poweroff = Gtk.Image.new_from_file(str(shutdown_icon_path))
-        shutdown_btn = Gtk.Button()
-        shutdown_btn.set_image(image_poweroff)
-        shutdown_btn.connect("clicked", self.on_shutdown_clicked)
-
-        # Botón para reiniciar
-        restart_icon_path = config_dir / config_data['theme']['restart_icon']
-        image_reboot = Gtk.Image.new_from_file(str(restart_icon_path))
-        reboot_btn = Gtk.Button()
-        reboot_btn.set_image(image_reboot)
-        reboot_btn.connect("clicked", self.on_reboot_clicked)
-
-        # Botón para cerrar sesión
-        logout_icon_path = config_dir / config_data['theme']['logout_icon']
-        image_logout = Gtk.Image.new_from_file(str(logout_icon_path))
-        logout_btn = Gtk.Button()
-        logout_btn.set_image(image_logout)
-        logout_btn.connect("clicked", self.on_logout_clicked)
-
-        # Botón para hibernar
-        hibernate_icon_path = config_dir / config_data['theme']['hibernate_icon']
-        image_hibernate = Gtk.Image.new_from_file(str(hibernate_icon_path))
-        hibernate_btn = Gtk.Button()
-        hibernate_btn.set_image(image_hibernate)
-        hibernate_btn.connect("clicked", self.on_hibernate_clicked)
-
-        # Botón para Lock
-        # lock_icon_path = config_dir / config_data['theme']['lock_icon']
-        # image_lock = Gtk.Image.new_from_file(str(lock_icon_path))
-        # lock_btn = Gtk.Button()
-        # lock_btn.set_image(image_lock)
-        # lock_btn.connect("clicked", self.on_lock_clicked)
-
-        # Botón para Suspend
-        # suspend_icon_path = config_dir / config_data['theme']['suspend_icon']
-        # image_suspend = Gtk.Image.new_from_file(str(suspend_icon_path))
-        # suspend_btn = Gtk.Button()
-        # suspend_btn.set_image(image_suspend)
-        # suspend_btn.connect("clicked", self.on_suspend_clicked)
-
-        # Botón para Switch
-        # switch_icon_path = config_dir / config_data['theme']['switch_icon']
-        # image_switch = Gtk.Image.new_from_file(str(switch_icon_path))
-        # switch_btn = Gtk.Button()
-        # switch_btn.set_image(image_switch)
-        # switch_btn.connect("clicked", self.on_switch_clicked)
-
-        # Botón para Cancel
-        cancel_icon_path = config_dir / config_data['theme']['cancel_icon']
-        image_cancel = Gtk.Image.new_from_file(str(cancel_icon_path))
-        cancel_btn = Gtk.Button()
-        cancel_btn.set_image(image_cancel)
-        cancel_btn.connect("clicked", self.on_cancel_clicked)
-
-        main_box.pack_start(shutdown_btn, True, False, 0)
-        main_box.pack_start(reboot_btn, True, False, 0)
-        main_box.pack_start(logout_btn, True, False, 0)
-        main_box.pack_start(hibernate_btn, True, False, 0)
-        # main_box.pack_start(lock_btn, True, False, 0)
-        # main_box.pack_start(suspend_btn, True, False, 0)
-        # main_box.pack_start(switch_btn, True, False, 0)
-        main_box.pack_start(cancel_btn, True, False, 0)
+        # --- Crear botones dinámicamente ---
+        # Lee el orden y la presencia de los botones desde el archivo de configuración
+        button_order = self.config_data['layout']['buttons']
+        
+        for action_key in button_order:
+            # Solo crea el widget si la acción está definida en el action_map
+            if action_key in self.action_map:
+                widget = self._create_button_with_label(action_key)
+                if widget:
+                    main_box.pack_start(widget, True, False, 0)
 
         self.connect("key-press-event", self.on_key_press)
 
+    def _create_button_with_label(self, action_key):
+        """Crea una VBox que contiene un botón con imagen y una etiqueta con formato."""
+        try:
+            # 1. Obtener datos de la configuración
+            label_text = self.config_data['labels'][action_key]
+            shortcut_key = self.config_data['shortcuts'][action_key]
+            icon_name = self.config_data['theme'][f'{action_key}_icon']
+            icon_path = self.config_dir / icon_name
+            color = self.config_data['theme']['highlight_color']
+
+            # 2. Construir el marcado Pango para la etiqueta
+            pos = label_text.lower().find(shortcut_key.lower())
+            if pos != -1:
+                # Resaltar la primera ocurrencia de la letra en el texto
+                pre = label_text[:pos]
+                char = label_text[pos:pos+len(shortcut_key)]
+                post = label_text[pos+len(shortcut_key):]
+                markup = f"{pre}<span foreground='{color}'>{char}</span>{post}"
+            else:
+                # Añadir el atajo entre paréntesis al final
+                markup = f"{label_text} (<span foreground='{color}'>{shortcut_key}</span>)"
+
+            # 3. Crear los widgets
+            vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+
+            # Botón con imagen
+            image = Gtk.Image.new_from_file(str(icon_path))
+            button = Gtk.Button()
+            button.set_image(image)
+            button.connect("clicked", self.action_map[action_key])
+            vbox.pack_start(button, False, False, 0)
+
+            # Etiqueta con formato
+            label = Gtk.Label()
+            label.set_use_markup(True)
+            label.set_markup(markup)
+            vbox.pack_start(label, False, False, 0)
+
+            return vbox
+        except KeyError as e:
+            print(f"Advertencia: Falta la configuración para la acción '{action_key}': {e}. No se creará el botón.")
+            return None
+
     def on_key_press(self, widget, event):
-        if event.keyval == Gdk.KEY_Escape:
-            print("Saliendo con la tecla ESC...")
-            Gtk.main_quit()
-        # Aqui se pondria las teclas rapidas cuando se implementen
-        if event.keyval == Gdk.KEY_s:
-            self.on_shutdown_clicked(widget)
-            Gtk.main_quit()
+        # Obtener el nombre de la tecla presionada
+        key_name = Gdk.keyval_name(event.keyval)
+
+        # Comprobar si la tecla está en el mapa de atajos
+        if key_name in self.key_map:
+            # Obtener el nombre de la acción (ej: 'shutdown')
+            action_name = self.key_map[key_name]
+            
+            # Comprobar si esa acción tiene una función asociada
+            if action_name in self.action_map:
+                print(f"Atajo de teclado detectado: '{key_name}' -> Acción: '{action_name}'")
+                # Obtener y ejecutar la función (pasamos None como argumento del widget)
+                self.action_map[action_name](None)
 
     def on_shutdown_clicked(self, widget):
         print("Apagando...")
@@ -165,23 +175,23 @@ class ShutdownApp(Gtk.Window):
         os.system(command)
         Gtk.main_quit()
 
-    # def on_lock_clicked(self, widget):
-    #     print("Bloqueando...")
-    #     command = self.config_data['commands']['lock']
-    #     os.system(command)
-    #     Gtk.main_quit()
+    def on_lock_clicked(self, widget):
+        print("Bloqueando...")
+        command = self.config_data['commands']['lock']
+        os.system(command)
+        Gtk.main_quit()
 
-    # def on_suspend_clicked(self, widget):
-    #     print("Suspenciendo...")
-    #     command = self.config_data['commands']['suspend']
-    #     os.system(command)
-    #     Gtk.main_quit()
+    def on_suspend_clicked(self, widget):
+        print("Suspenciendo...")
+        command = self.config_data['commands']['suspend']
+        os.system(command)
+        Gtk.main_quit()
 
-    # def on_switch_clicked(self, widget):
-    #     print("Cambiando de Usuario...")
-    #     command = self.config_data['commands']['switch']
-    #     os.system(command)
-    #     Gtk.main_quit()
+    def on_switch_clicked(self, widget):
+        print("Cambiando de Usuario...")
+        command = self.config_data['commands']['switch']
+        os.system(command)
+        Gtk.main_quit()
 
     def on_cancel_clicked(self, widget):
         print("Saliendo...")

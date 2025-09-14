@@ -54,11 +54,13 @@ El resto de las dependencias de Python se gestionan con el archivo `requirements
 
 Toda la personalización se realiza en el archivo `~/.config/pylogout/pylogout.conf`.
 
+*   **`[layout]`**: Controla qué botones se muestran y en qué orden. Simplemente edita la lista `buttons` para añadir, quitar o reordenar los botones.
+*   **`[labels]`**: Edita el texto que aparece debajo de cada botón.
 *   **`[commands]`**: Adapta aquí los comandos de apagado, reinicio, etc., a tu sistema. Por defecto, usa `systemctl`, pero puedes cambiarlo a lo que necesites.
-*   **`[theme]`**: Cambia la imagen de fondo y los iconos. Simplemente coloca tus archivos en las carpetas `~/.config/pylogout/fondo` y `~/.config/pylogout/botones` y actualiza las rutas aquí.
+*   **`[theme]`**: Cambia la imagen de fondo, los iconos y el color de resaltado del atajo de teclado en las etiquetas (con el valor `highlight_color`). Simplemente coloca tus archivos en las carpetas `~/.config/pylogout/fondo` y `~/.config/pylogout/botones` y actualiza las rutas aquí.
 *   **`[shortcuts]`**: Define los atajos de teclado para cada acción.
 
 ## Próximos Pasos
 
--   [ ] Implementar los atajos de teclado.
--   [ ] Implementar carteles de texto al pie de los botones.
+-   [x] Implementar los atajos de teclado.
+-   [x] Implementar carteles de texto al pie de los botones.
